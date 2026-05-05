@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WalkSwap</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap');
+  :root {
+    --bg:#f5f5f7; --surface:#ffffff; --surface2:#f0f0f2; --border:#e0e0e5;
+    --text:#1a1a2e; --muted:#6b6b80; --accent:#0099cc; --red:#cc3333; --walk:#d4a017;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0 20px 60px}
+
+  .wrap{position:relative;z-index:1;max-width:760px;margin:0 auto}
+  header{padding:32px 0 24px;border-bottom:1px solid var(--border);margin-bottom:28px}
+  .logo{font-family:'Bebas Neue',sans-serif;font-size:42px;letter-spacing:3px;line-height:1}
+  .logo span{color:var(--accent)}
+  .tagline{font-size:12px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:4px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+  @media(max-width:480px){.grid2{grid-template-columns:1fr}}
+  .row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+  label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:6px}
+  input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;padding:11px 14px;outline:none;width:100%;transition:border-color .2s,box-shadow .2s}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,170,.12)}
+  input::placeholder{color:var(--muted)}
+  .field{flex:1;min-width:120px}
+  .btn{background:var(--accent);color:#0d0d0f;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;padding:11px 28px;cursor:pointer;transition:opacity .2s,transform .15s;white-space:nowrap;flex:2;min-width:160px}
+  .btn:hover{opacity:.88;transform:translateY(-1px)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .loading{text-align:center;padding:48px 0;color:var(--muted)}
+  .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px}
+  .status{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-top:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes slideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  .jcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:14px;position:relative;animation:slideIn .3s ease both;transition:border-color .2s,transform .2s}
+  .jcard:hover{transform:translateY(-2px)}
+  .jcard.base{border-left:3px solid var(--accent);border-color:rgba(0,212,170,.3)}
+  .jcard.swap{border-left:3px solid var(--walk);border-color:rgba(249,199,79,.25)}
+  .badge{position:absolute;top:16px;right:16px;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;padding:3px 8px;border-radius:20px}
+  .badge.base{background:rgba(0,212,170,.12);color:var(--accent)}
+  .badge.swap{background:rgba(249,199,79,.12);color:var(--walk)}
+  .stats{display:flex;gap:22px;margin-bottom:14px;flex-wrap:wrap}
+  .stat-val{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:1px;line-height:1}
+  .stat-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600}
+  .legs{display:flex;align-items:center;flex-wrap:wrap}
+  .leg{display:flex;align-items:center;gap:8px;font-size:13px;padding:8px 12px;border-radius:6px;background:var(--surface2);margin:3px}
+  .leg.walk{background:rgba(249,199,79,.08);border:1px solid rgba(249,199,79,.2)}
+  .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .leg-text{line-height:1.3}
+  .leg-dur{color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;margin-left:auto;padding-left:8px;white-space:nowrap}
+  .arrow{color:var(--border);font-size:18px;margin:3px 2px}
+  .bar-wrap{margin-top:14px}
+  .bar-lbl{font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:1px}
+  .bar-track{height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--walk));border-radius:3px}
+  .swap-note{font-size:12px;color:var(--muted);margin-bottom:10px}
+  .swap-note strong{color:var(--walk)}
+  .err{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.25);border-radius:10px;padding:18px 20px;color:var(--red);font-size:14px;line-height:1.6}
+  .notice{background:rgba(0,212,170,.06);border:1px solid rgba(0,212,170,.18);border-radius:8px;padding:11px 14px;font-size:12.5px;color:var(--muted);margin-bottom:20px;line-height:1.55}
+  .notice strong{color:var(--text)}
+  .notice code{background:var(--surface2);padding:1px 5px;border-radius:4px;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent)}
+  .rhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+  .rtitle{font-family:'Bebas Neue',sans-serif;font-size:21px;letter-spacing:1.5px;color:var(--muted)}
+  .rtitle span{color:var(--text)}
+  .footer{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:14px}
+
+  /* Interactive journey builder */
+  .journey-builder{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:14px}
+  .builder-label{font-size:12px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+  .legs-row{display:flex;align-items:center;flex-wrap:wrap}
+
+  .leg-btn{
+    display:flex;align-items:center;gap:8px;font-size:13px;
+    padding:10px 14px;border-radius:8px;background:var(--surface2);
+    margin:3px;cursor:pointer;border:2px solid transparent;
+    transition:all .15s;user-select:none;
+  }
+  .leg-btn:hover:not(.is-walk){border-color:rgba(249,199,79,.4);background:rgba(249,199,79,.06)}
+  .leg-btn.is-selected{border-color:var(--walk);background:rgba(249,199,79,.1)}
+  .leg-btn.is-walk{cursor:default;opacity:.7}
+  .leg-toggle{
+    width:18px;height:18px;border-radius:50%;border:1.5px solid var(--muted);
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;color:var(--muted);margin-left:4px;flex-shrink:0;
+  }
+  .leg-btn.is-selected .leg-toggle{border-color:var(--walk);color:var(--walk)}
+
+  /* Walk action bar */
+  .walk-action{
+    background:rgba(249,199,79,.06);border:1px solid rgba(249,199,79,.25);
+    border-radius:10px;padding:16px 18px;margin-bottom:14px;
+    display:flex;align-items:center;flex-wrap:wrap;gap:10px;
+  }
+  .walk-action>div{flex:1;min-width:200px}
+  .btn-swap{
+    background:var(--walk);color:#ffffff;border:none;border-radius:8px;
+    font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;
+    padding:10px 20px;cursor:pointer;white-space:nowrap;transition:opacity .15s;
+  }
+  .btn-swap:hover{opacity:.85}
+  .btn-swap:disabled{opacity:.4;cursor:not-allowed}
+  .btn-clear{
+    background:transparent;color:var(--muted);border:1px solid var(--border);
+    border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;
+    padding:9px 16px;cursor:pointer;white-space:nowrap;transition:border-color .15s;
+  }
+  .btn-clear:hover{border-color:var(--muted)}
+
+  /* Swap result */
+  .swap-result{
+    background:var(--surface);border:1px solid rgba(0,212,170,.25);
+    border-left:3px solid var(--accent);border-radius:12px;
+    padding:20px 22px;margin-bottom:14px;animation:slideIn .3s ease both;
+  }
+  .swap-result.error{border-color:rgba(255,107,107,.3);border-left-color:var(--red);color:var(--red);font-size:13px}
+  .swap-stats{display:flex;gap:22px;flex-wrap:wrap}
+  .swap-stat{display:flex;flex-direction:column;gap:2px}
+  .swap-val{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px;line-height:1}
+  .swap-lbl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600}
+
+  /* Autocomplete */
+  .ac-wrap{position:relative}
+  .ac-drop{
+    position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:100;
+    background:var(--surface2);border:1px solid var(--accent);border-radius:8px;
+    overflow:hidden;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);
+  }
+  .ac-drop.open{display:block}
+  .ac-item{
+    padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);
+    display:flex;flex-direction:column;gap:2px;transition:background .1s;
+  }
+  .ac-item:last-child{border-bottom:none}
+  .ac-item:hover,.ac-item.active{background:rgba(0,212,170,.1)}
+  .ac-item-name{color:var(--text);font-weight:500}
+  .ac-item-sub{color:var(--muted);font-size:11px;font-family:'DM Mono',monospace}
+  .ac-empty{padding:12px 14px;font-size:13px;color:var(--muted);font-style:italic}
+
+  /* Map */
+  .map-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px}
+  .map-header{padding:12px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .map-title{font-size:13px;font-weight:600;color:var(--text)}
+  .map-legend{display:flex;gap:14px;margin-left:auto;flex-wrap:wrap}
+  .map-leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)}
+  .map-leg-line{width:20px;height:3px;border-radius:2px}
+  #routeMap{height:340px;width:100%}
+
+  /* Live timing panel */
+  .live-panel{
+    background:#f0f8ff;border:1px solid rgba(0,153,204,.25);
+    border-left:3px solid var(--accent);border-radius:10px;
+    padding:14px 16px;margin:14px 0;
+  }
+  .live-header{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+  .live-dot{
+    width:8px;height:8px;border-radius:50%;background:#22c55e;flex-shrink:0;
+    box-shadow:0 0 6px #22c55e;animation:livepulse 1.5s infinite;
+  }
+  @keyframes livepulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+  .live-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent)}
+  .live-steps{display:flex;flex-direction:column;gap:0}
+  .live-step{display:flex;align-items:flex-start;gap:12px}
+  .live-step-icon{font-size:18px;line-height:1;padding-top:2px;flex-shrink:0}
+  .live-step-body{flex:1}
+  .live-step-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+  .live-step-detail{font-size:12px;color:var(--muted);line-height:1.5}
+  .live-connector{width:2px;height:16px;background:var(--border);margin:4px 0 4px 9px}
+
+  /* Departures board */
+  .live-board{margin-top:14px;border-top:1px solid var(--border);padding-top:12px}
+  .live-board-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px}
+  .live-board-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px}
+  .live-board-row:last-child{border-bottom:none}
+  .live-board-line{font-weight:600;color:var(--text);min-width:100px}
+  .live-board-towards{color:var(--muted);flex:1}
+  .live-board-time{font-family:'DM Mono',monospace;color:var(--accent);white-space:nowrap}
+  .live-board-time em{color:var(--muted);font-style:normal}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">Walk<span>Swap</span></div>
+    <div class="tagline">Walk more · Travel smarter · Lose weight</div>
+  </header>
+
+  <div class="notice">
+    <strong>Save this file and open it locally</strong> — it won't work inside Claude's sandbox but works perfectly in any browser from your desktop/phone.
+    Get a free TfL key at <code>api-portal.tfl.gov.uk</code> → sign up → Products → Subscribe → copy Primary key.
+  </div>
+
+  <div class="card">
+    <div class="grid2">
+      <div>
+        <label>From</label>
+        <div class="ac-wrap" id="ac-from">
+          <input id="from" placeholder="e.g. Finsbury Park" autocomplete="off" oninput="acSearch('from')" onblur="acBlur('from')" onfocus="acSearch('from')">
+          <div class="ac-drop" id="ac-from-drop"></div>
+        </div>
+      </div>
+      <div>
+        <label>To</label>
+        <div class="ac-wrap" id="ac-to">
+          <input id="to" placeholder="e.g. Stratford" autocomplete="off" oninput="acSearch('to')" onblur="acBlur('to')" onfocus="acSearch('to')">
+          <div class="ac-drop" id="ac-to-drop"></div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label>TfL App Key</label><input id="key" placeholder="your_app_key" style="font-family:'DM Mono',monospace;font-size:13px">
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn" id="btn" onclick="plan()" style="width:100%">» Plan Journey</button>
+    </div>
+  </div>
+
+  <div class="map-wrap" id="mapWrap" style="display:none">
+  <div class="map-header">
+    <span class="map-title">Route Map</span>
+    <div class="map-legend">
+      <div class="map-leg-item"><div class="map-leg-line" style="background:#0099cc"></div> Transit</div>
+      <div class="map-leg-item"><div class="map-leg-line" style="background:#d4a017;border-top:2px dashed #d4a017;height:0"></div> Walk</div>
+    </div>
+  </div>
+  <div id="routeMap"></div>
+</div>
+<div id="out"></div>
+</div>
+
+<script>
+const STEPS_WALK = 100, STEPS_TRANSIT = 15;
+
+const LINE_COLOURS = {
+  victoria:'#009fe0',jubilee:'#a0a5a9',northern:'#a0a0a0',central:'#e32017',
+  bakerloo:'#b36305',piccadilly:'#003688',district:'#00782a',circle:'#ffd300',
+  metropolitan:'#9b0056','elizabeth':'#6950a1','elizabeth line':'#6950a1',
+  overground:'#ee7c0e','london overground':'#ee7c0e',
+  dlr:'#00afad',bus:'#e1251b',walking:'#d4a017','national rail':'#a0522d',
+  suffragette:'#ee7c0e',lioness:'#ee7c0e',mildmay:'#ee7c0e',windrush:'#ee7c0e',
+  weaver:'#ee7c0e',liberty:'#ee7c0e'
+};
+
+function colour(leg){
+  const k=(leg.routeOptions?.[0]?.name||leg.mode?.name||leg.mode?.id||'').toLowerCase();
+  const m=(leg.mode?.id||'').toLowerCase();
+  if(m==='walking')return LINE_COLOURS.walking;
+  for(const[n,v]of Object.entries(LINE_COLOURS))if(k.includes(n))return v;
+  return '#888';
+}
+
+function emoji(mode){
+  const m=(mode||'').toLowerCase();
+  if(m==='walking')return'🚶';if(m==='bus')return'🚌';if(m==='dlr')return'🚈';
+  if(m==='overground')return'🚆';if(m.includes('elizabeth'))return'🟣';
+  if(m.includes('national'))return'🚉';return'🚇';
+}
+
+function legLabel(leg){
+  const mode=leg.mode?.id||'';
+  const route=leg.routeOptions?.[0]?.name||leg.mode?.name||mode;
+  return `${emoji(mode)}${route&&route.toLowerCase()!==mode.toLowerCase()?' · '+route:''}`;
+}
+
+function legMins(leg){
+  if(leg.duration&&leg.duration>0)return leg.duration;
+  if(leg.departureTime&&leg.arrivalTime){
+    const diff=Math.round((new Date(leg.arrivalTime)-new Date(leg.departureTime))/60000);
+    if(diff>0)return diff;
+  }
+  return 0;
+}
+
+function totalMins(legs){return legs.reduce((s,l)=>s+legMins(l),0);}
+
+function estSteps(legs){
+  return legs.reduce((s,l)=>{
+    const walk=(l.mode?.id||'').toLowerCase()==='walking';
+    return s+legMins(l)*(walk?STEPS_WALK:STEPS_TRANSIT);
+  },0);
+}
+
+function setStatus(msg,sub=''){
+  document.getElementById('out').innerHTML=`
+    <div class="loading"><div class="spinner"></div><div>${msg}</div>
+    ${sub?`<div class="status">${sub}</div>`:''}</div>`;
+}
+
+async function tfl(path){
+  const key=document.getElementById('key').value.trim();
+  const sep=path.includes('?')?'&':'?';
+  const url=`https://api.tfl.gov.uk${path}${key?sep+'app_key='+encodeURIComponent(key):''}`;
+  const r=await fetch(url);
+  const body=await r.json();
+  if(r.status===300)return{_disambig:true,body};
+  if(!r.ok)throw new Error(`TfL ${r.status}: ${JSON.stringify(body).slice(0,200)}`);
+  return body;
+}
+
+async function resolveStation(name){
+  const key=document.getElementById('key').value.trim();
+  const keyQ=key?'&app_key='+encodeURIComponent(key):'';
+  const url=`https://api.tfl.gov.uk/StopPoint/Search/${encodeURIComponent(name)}?modes=tube,dlr,overground,elizabeth-line,national-rail&maxResults=1${keyQ}`;
+  const r=await fetch(url);
+  if(!r.ok)return name;
+  const data=await r.json();
+  const match=data?.matches?.[0];
+  return match?(match.icsCode||match.id||name):name;
+}
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 +
+    Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+async function fetchWalk(fromLatLon, toLatLon){
+  const [fLat, fLon] = fromLatLon.split(',').map(Number);
+  const [toLat, toLon] = toLatLon.split(',').map(Number);
+
+  // Haversine straight-line distance × 1.35 urban detour factor, at Josh's pace of 18 min/mile
+  const distKm = haversineKm(fLat, fLon, toLat, toLon);
+  const routedKm = distKm * 1.35;
+  const distMiles = routedKm * 0.621371;
+  const mins = Math.round(distMiles * 18);
+
+  if (mins <= 0 || mins > 120) return null;
+
+  const walkLeg = {
+    mode: { id: 'walking', name: 'Walking' },
+    routeOptions: [],
+    duration: mins,
+    departurePoint: { lat: fLat, lon: fLon, commonName: '' },
+    arrivalPoint:   { lat: toLat, lon: toLon, commonName: '' },
+    _synthetic: true,
+  };
+  return { mins, legs: [walkLeg] };
+}
+
+// ── Autocomplete ────────────────────────────────────────────
+const acState = {
+  from: { timer: null, chosen: null },
+  to:   { timer: null, chosen: null },
+};
+
+async function acFetch(query) {
+  const key = document.getElementById('key').value.trim();
+  const keyQ = key ? '&app_key=' + encodeURIComponent(key) : '';
+  const url = `https://api.tfl.gov.uk/StopPoint/Search/${encodeURIComponent(query)}?modes=tube,dlr,overground,elizabeth-line,national-rail,bus&maxResults=5${keyQ}`;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return [];
+    const data = await r.json();
+    return (data.matches || []).slice(0, 5);
+  } catch { return []; }
+}
+
+function acSearch(field) {
+  const inp = document.getElementById(field);
+  const drop = document.getElementById(`ac-${field}-drop`);
+  const val = inp.value.trim();
+
+  acState[field].chosen = null;
+  clearTimeout(acState[field].timer);
+  if (val.length < 2) { drop.classList.remove('open'); return; }
+
+  acState[field].timer = setTimeout(async () => {
+    const matches = await acFetch(val);
+    drop.innerHTML = '';
+    if (!matches.length) {
+      const el = document.createElement('div');
+      el.className = 'ac-empty';
+      el.textContent = 'No stations found';
+      drop.appendChild(el);
+    } else {
+      matches.forEach(m => {
+        const modes = [...new Set((m.modes||[]).map(mo=>mo.charAt(0).toUpperCase()+mo.slice(1)))].join(', ');
+        const el = document.createElement('div');
+        el.className = 'ac-item';
+        el.innerHTML = `<span class="ac-item-name">${m.name}</span><span class="ac-item-sub">${modes||'Station'}</span>`;
+        // Use mousedown + preventDefault to fire before blur
+        el.addEventListener('mousedown', e => {
+          e.preventDefault();
+          acPick(field, m.icsCode||m.id, m.name);
+        });
+        // Also handle touchstart for mobile
+        el.addEventListener('touchstart', e => {
+          e.preventDefault();
+          acPick(field, m.icsCode||m.id, m.name);
+        });
+        drop.appendChild(el);
+      });
+    }
+    drop.classList.add('open');
+  }, 280);
+}
+
+function acPick(field, icsCode, name) {
+  const inp = document.getElementById(field);
+  const drop = document.getElementById(`ac-${field}-drop`);
+  inp.value = name;
+  acState[field].chosen = { icsCode, name };
+  drop.classList.remove('open');
+  inp.blur();
+}
+
+function acBlur(field) {
+  // Delay to allow mousedown/touchstart on item to fire first
+  setTimeout(() => {
+    document.getElementById(`ac-${field}-drop`).classList.remove('open');
+  }, 300);
+}
+
+function getStationId(field) {
+  // Return the chosen icsCode if user picked from dropdown, else raw text
+  return acState[field].chosen?.icsCode || document.getElementById(field).value.trim();
+}
+
+// ── Map ─────────────────────────────────────────────────────
+let MAP = null;
+let MAP_LAYERS = [];
+
+function initMap(centerLat, centerLon) {
+  if (MAP) {
+    MAP.remove();
+    MAP = null;
+  }
+  MAP = L.map('routeMap', { zoomControl: true, attributionControl: true });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO',
+    subdomains: 'abcd', maxZoom: 19
+  }).addTo(MAP);
+  MAP_LAYERS = [];
+}
+
+function clearMapLayers() {
+  MAP_LAYERS.forEach(l => MAP.removeLayer(l));
+  MAP_LAYERS = [];
+}
+
+async function fetchOSRMRoute(lat1, lon1, lat2, lon2, profile='foot') {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/${profile}/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (data.code !== 'Ok') return null;
+    // coords come as [lon,lat], flip to [lat,lon] for Leaflet
+    return data.routes[0].geometry.coordinates.map(([ln,lt]) => [lt,ln]);
+  } catch { return null; }
+}
+
+function makeStopMarker(lat, lon, name, colour) {
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="width:10px;height:10px;border-radius:50%;background:${colour};border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.5)"></div>`,
+    iconSize: [10,10], iconAnchor: [5,5]
+  });
+  const marker = L.marker([lat,lon], {icon}).bindTooltip(name, {direction:'top', offset:[0,-8]});
+  return marker;
+}
+
+async function renderTransitRoute(legs) {
+  if (!MAP) return;
+  clearMapLayers();
+  const bounds = [];
+
+  for (let i = 0; i < legs.length; i++) {
+    const leg = legs[i];
+    const fp = leg.departurePoint, tp = leg.arrivalPoint;
+    if (!fp?.lat || !tp?.lat) continue;
+
+    const isWalk = (leg.mode?.id||'').toLowerCase() === 'walking';
+    const col = isWalk ? '#d4a017' : (colour(leg) || '#0099cc');
+
+    // Get OSRM route geometry for this leg
+    const profile = isWalk ? 'foot' : 'car'; // car approximates transit corridors
+    const coords = await fetchOSRMRoute(fp.lat, fp.lon, tp.lat, tp.lon, profile);
+    const lineCoords = coords || [[fp.lat, fp.lon],[tp.lat, tp.lon]];
+
+    const poly = L.polyline(lineCoords, {
+      color: col, weight: isWalk ? 4 : 5,
+      opacity: 0.85,
+      dashArray: isWalk ? '8,6' : null,
+    }).addTo(MAP);
+    MAP_LAYERS.push(poly);
+    bounds.push(...lineCoords);
+
+    // Stop markers
+    const fromName = fp.commonName || '';
+    const toName = tp.commonName || '';
+    if (i === 0) {
+      const m = makeStopMarker(fp.lat, fp.lon, fromName, '#fff').addTo(MAP);
+      MAP_LAYERS.push(m);
+    }
+    const m2 = makeStopMarker(tp.lat, tp.lon, toName, i === legs.length-1 ? '#0099cc' : col).addTo(MAP);
+    MAP_LAYERS.push(m2);
+  }
+
+  if (bounds.length) MAP.fitBounds(bounds, {padding:[28,28]});
+}
+
+async function renderSwapRoute(legs) {
+  if (!MAP) return;
+  clearMapLayers();
+  const bounds = [];
+
+  for (let i = 0; i < legs.length; i++) {
+    const leg = legs[i];
+    const fp = leg.departurePoint, tp = leg.arrivalPoint;
+    if (!fp?.lat || !tp?.lat) continue;
+
+    const isWalk = (leg.mode?.id||'').toLowerCase() === 'walking';
+    const col = isWalk ? '#d4a017' : (colour(leg) || '#0099cc');
+    const profile = isWalk ? 'foot' : 'car';
+
+    const coords = await fetchOSRMRoute(fp.lat, fp.lon, tp.lat, tp.lon, profile);
+    const lineCoords = coords || [[fp.lat,fp.lon],[tp.lat,tp.lon]];
+
+    const poly = L.polyline(lineCoords, {
+      color: col, weight: isWalk ? 5 : 4,
+      opacity: 0.9,
+      dashArray: isWalk ? '10,7' : null,
+    }).addTo(MAP);
+    MAP_LAYERS.push(poly);
+    bounds.push(...lineCoords);
+
+    if (i === 0) {
+      MAP_LAYERS.push(makeStopMarker(fp.lat, fp.lon, fp.commonName||'', '#fff').addTo(MAP));
+    }
+    MAP_LAYERS.push(makeStopMarker(tp.lat, tp.lon, tp.commonName||'', isWalk ? '#d4a017' : col).addTo(MAP));
+  }
+
+  if (bounds.length) MAP.fitBounds(bounds, {padding:[28,28]});
+}
+
+// ── State ────────────────────────────────────────────────────
+let STATE = {
+  basePath: null,      // { legs, fromName, toName }
+  selected: new Set(), // indices of base legs selected for walking
+  walkResult: null,    // computed walk-swap result
+};
+
+// ── Render the interactive base journey ─────────────────────
+function renderBase(){
+  const {basePath, selected} = STATE;
+  const legs = basePath.legs;
+  const baseTotal = totalMins(legs);
+  const baseSteps = estSteps(legs);
+
+  const legsHtml = legs.map((leg,i)=>{
+    const isWalk=(leg.mode?.id||'').toLowerCase()==='walking';
+    const isSel=selected.has(i);
+    const c=colour(leg);
+    const from=leg.departurePoint?.commonName||'';
+    const to=leg.arrivalPoint?.commonName||'';
+    const mins=legMins(leg);
+    return `
+      ${i>0?'<div class="arrow">›</div>':''}
+      <div class="leg-btn ${isWalk?'is-walk':''} ${isSel?'is-selected':''}" data-idx="${i}"
+           onclick="toggleLeg(${i})" title="${isWalk?'Walking leg (cannot swap)':'Click to mark this leg as a walk instead'}">
+        <span class="dot" style="background:${isSel?'#d4a017':c}"></span>
+        <span class="leg-text">
+          ${isSel?'🚶 Walk instead':''}${!isSel?legLabel(leg):''}
+          <br><small>${from} → ${to}</small>
+        </span>
+        <span class="leg-dur">${mins}m</span>
+        ${!isWalk?`<span class="leg-toggle">${isSel?'✕':'+'}</span>`:''}
+      </div>`;
+  }).join('');
+
+  // Walk-swap result panel
+  let swapHtml='';
+  if(STATE.walkResult){
+    const wr=STATE.walkResult;
+    if(wr.error){
+      swapHtml=`<div class="swap-result error">${wr.error}</div>`;
+    } else {
+      const newTotal=wr.totalMins;
+      const newSteps=wr.steps;
+      const extraMins=newTotal-baseTotal;
+      const extraSteps=Math.round((newSteps-baseSteps)/Math.max(baseSteps,1)*100);
+      const swapLegsHtml=wr.legs.map((leg,i)=>{
+        const isWalk=(leg.mode?.id||'').toLowerCase()==='walking';
+        const c=colour(leg);
+        const from=leg.departurePoint?.commonName||'';
+        const to=leg.arrivalPoint?.commonName||'';
+        const mins=legMins(leg);
+        return `
+          ${i>0?'<div class="arrow" style="color:#3a3a45">›</div>':''}
+          <div class="leg ${isWalk?'walk':''}">
+            <span class="dot" style="background:${c}"></span>
+            <span class="leg-text">${legLabel(leg)}<br><small>${from} → ${to}</small></span>
+            <span class="leg-dur">${mins}m</span>
+          </div>`;
+      }).join('');
+
+      const ld = wr.liveData;
+      const liveHtml = ld ? `
+        <div class="live-panel">
+          <div class="live-header">
+            <span class="live-dot" style="background:${ld.isLive?'#22c55e':'#f59e0b'};box-shadow:0 0 6px ${ld.isLive?'#22c55e':'#f59e0b'}"></span>
+            <span class="live-title">${ld.isLive ? 'Live Timing' : 'Scheduled Timing'} — leaving now</span>
+          </div>
+          <div class="live-steps">
+            <div class="live-step">
+              <div class="live-step-icon">🚶</div>
+              <div class="live-step-body">
+                <div class="live-step-label">Walk to ${ld.boardingStop}</div>
+                <div class="live-step-detail">${ld.walkMins} min · arrive ~<strong>${ld.readyAtStr}</strong></div>
+              </div>
+            </div>
+            <div class="live-connector"></div>
+            <div class="live-step">
+              <div class="live-step-icon">🚆</div>
+              <div class="live-step-body">
+                <div class="live-step-label">${ld.lineName} towards ${ld.towards}</div>
+                <div class="live-step-detail">
+                  Departs <strong>${ld.trainTimeStr}</strong>
+                  · in <strong style="color:var(--accent)">${ld.trainMinsFromNow} min</strong>
+                  · ~${ld.waitMins}m wait at platform
+                </div>
+              </div>
+            </div>
+            <div class="live-connector"></div>
+            <div class="live-step">
+              <div class="live-step-icon">📍</div>
+              <div class="live-step-body">
+                <div class="live-step-label">Arrive at destination</div>
+                <div class="live-step-detail">
+                  <strong>${ld.destArrivalStr}</strong>
+                  · in <strong style="color:var(--accent)">${ld.destMinsFromNow} min</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+          ${ld.nextTrains?.length ? `
+          <div class="live-board">
+            <div class="live-board-title">Next trains at ${ld.boardingStop}</div>
+            ${ld.nextTrains.map(t=>`
+              <div class="live-board-row">
+                <span class="live-board-line">${t.line}</span>
+                <span class="live-board-towards">${t.towards}</span>
+                <span class="live-board-time">${t.time} <em>(${t.mins}m)</em></span>
+              </div>`).join('')}
+          </div>` : ''}
+        </div>` : '';
+
+      swapHtml=`
+        <div class="swap-result">
+          <div class="swap-stats">
+            <div class="swap-stat">
+              <span class="swap-val">${newTotal}m</span>
+              <span class="swap-lbl">total time</span>
+            </div>
+            <div class="swap-stat">
+              <span class="swap-val" style="color:var(--walk)">~${newSteps.toLocaleString()}</span>
+              <span class="swap-lbl">est. steps</span>
+            </div>
+            <div class="swap-stat">
+              <span class="swap-val" style="color:${extraMins>0?'var(--muted)':'var(--accent)'}">
+                ${extraMins>0?'+':''}${extraMins}m
+              </span>
+              <span class="swap-lbl">extra time</span>
+            </div>
+            <div class="swap-stat">
+              <span class="swap-val" style="color:var(--walk)">+${extraSteps}%</span>
+              <span class="swap-lbl">more steps</span>
+            </div>
+          </div>
+          ${liveHtml}
+          <div class="legs" style="margin-top:12px">${swapLegsHtml}</div>
+        </div>`;
+    }
+  }
+
+  const anySelected=selected.size>0;
+
+  document.getElementById('out').innerHTML=`
+    <div class="rhead">
+      <div class="rtitle"><span>${basePath.fromName}</span> → <span>${basePath.toName}</span></div>
+      <div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace">${baseTotal}m · ~${baseSteps.toLocaleString()} steps</div>
+    </div>
+
+    <div class="journey-builder">
+      <div class="builder-label">
+        <span style="color:var(--accent)">●</span> Fastest route
+        <span style="color:var(--muted);font-size:11px;margin-left:8px">Tap any transit leg to walk it instead</span>
+      </div>
+      <div class="legs-row">${legsHtml}</div>
+    </div>
+
+    ${anySelected?`
+    <div class="walk-action">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">
+        Walking <strong style="color:var(--walk)">${selected.size} leg${selected.size>1?'s':''}</strong> —
+        from <strong style="color:var(--text)">${legs[[...selected][0]]?.departurePoint?.commonName||'?'}</strong>
+        to <strong style="color:var(--text)">${legs[[...selected][selected.size-1]]?.arrivalPoint?.commonName||'?'}</strong>
+      </div>
+      <button class="btn-swap" onclick="computeSwap()" id="swapBtn">
+        🚶 Calculate this walk swap
+      </button>
+      <button class="btn-clear" onclick="clearSelection()">Clear</button>
+    </div>
+    ${swapHtml}`:''}
+
+    ${!anySelected&&STATE.walkResult?swapHtml:''}
+
+    <div class="footer" style="margin-top:16px">${STEPS_WALK}/min walking · ${STEPS_TRANSIT}/min transit · Live TfL data</div>
+  `;
+}
+
+function toggleLeg(idx){
+  const leg=STATE.basePath.legs[idx];
+  if((leg.mode?.id||'').toLowerCase()==='walking')return; // can't swap a walking leg
+  if(STATE.selected.has(idx)){
+    STATE.selected.delete(idx);
+  } else {
+    STATE.selected.add(idx);
+  }
+  STATE.walkResult=null;
+  renderBase();
+}
+
+function clearSelection(){
+  STATE.selected.clear();
+  STATE.walkResult=null;
+  renderBase();
+}
+
+// ── Live arrivals ────────────────────────────────────────────
+
+function fmtTime(date) {
+  return date.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+}
+
+function minsFromNow(date) {
+  return Math.round((date - Date.now()) / 60000);
+}
+
+// Get NaptanId for a stop
+async function getNaptanId(commonName, lat, lon) {
+  try {
+    const key = document.getElementById('key').value.trim();
+    const keyQ = key ? '&app_key=' + encodeURIComponent(key) : '';
+    const url = `https://api.tfl.gov.uk/StopPoint/Search/${encodeURIComponent(commonName)}?modes=tube,dlr,overground,elizabeth-line,national-rail&maxResults=5${keyQ}`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (!data.matches?.length) return null;
+    let best = null, bestDist = Infinity;
+    for (const m of data.matches) {
+      const d = Math.abs((m.lat||0) - lat) + Math.abs((m.lon||0) - lon);
+      if (d < bestDist) { bestDist = d; best = m; }
+    }
+    return best?.id || data.matches[0]?.id || null;
+  } catch { return null; }
+}
+
+// Fetch live arrivals at a stop filtered by line — only covers next ~30min
+async function getLiveArrivals(naptanId, lineId) {
+  try {
+    const key = document.getElementById('key').value.trim();
+    const keyQ = key ? '?app_key=' + encodeURIComponent(key) : '';
+    const url = `https://api.tfl.gov.uk/StopPoint/${encodeURIComponent(naptanId)}/Arrivals${keyQ}`;
+    const r = await fetch(url);
+    if (!r.ok) return [];
+    const arrivals = await r.json();
+    const lineKey = (lineId||'').toLowerCase();
+    const filtered = arrivals.filter(a =>
+      !lineKey ||
+      (a.lineName||'').toLowerCase().includes(lineKey) ||
+      (a.lineId||'').toLowerCase().includes(lineKey)
+    );
+    filtered.sort((a,b) => a.timeToStation - b.timeToStation);
+    return filtered;
+  } catch { return []; }
+}
+
+// Use TfL journey planner with a future time to get scheduled service
+async function getScheduledJourney(fromId, toId, departureTime) {
+  try {
+    const pad = n => String(n).padStart(2,'0');
+    const timeStr = `${pad(departureTime.getHours())}${pad(departureTime.getMinutes())}`;
+    const dateStr = `${departureTime.getFullYear()}${pad(departureTime.getMonth()+1)}${pad(departureTime.getDate())}`;
+    const data = await tfl(`/Journey/JourneyResults/${encodeURIComponent(fromId)}/to/${encodeURIComponent(toId)}?mode=tube,dlr,overground,elizabeth-line,bus,national-rail&time=${timeStr}&date=${dateStr}&timeIs=Departing`);
+    if (data?._disambig || !data?.journeys?.length) return null;
+    return data.journeys.reduce((a,b) => totalMins(a.legs) <= totalMins(b.legs) ? a : b);
+  } catch { return null; }
+}
+
+async function computeSwap(){
+  const btn=document.getElementById('swapBtn');
+  if(btn)btn.disabled=true;
+
+  const {basePath, selected} = STATE;
+  const legs = basePath.legs;
+  const indices = [...selected].sort((a,b)=>a-b);
+
+  // Walk from start of first selected leg to end of last selected leg
+  const walkFrom = legs[indices[0]].departurePoint;
+  const walkTo = legs[indices[indices.length-1]].arrivalPoint;
+
+  if(!walkFrom?.lat||!walkTo?.lat){
+    STATE.walkResult={error:'Missing location data for these legs.'};
+    renderBase();
+    return;
+  }
+
+  // Show loading inline
+  const action=document.querySelector('.walk-action');
+  if(action){
+    const p=document.createElement('div');
+    p.style.cssText='font-size:12px;color:var(--muted);margin-top:8px;font-family:monospace';
+    p.textContent=`Fetching walk time from TfL…`;
+    action.appendChild(p);
+  }
+
+  const walk=await fetchWalk(`${walkFrom.lat},${walkFrom.lon}`,`${walkTo.lat},${walkTo.lon}`);
+
+  if(!walk){
+    STATE.walkResult={error:`Couldn't find a walking route between these stops. They may be too far apart (over 90 minutes walk).`};
+    renderBase();
+    return;
+  }
+
+  // Inject station names into synthetic OSRM leg
+  if(walk.legs[0]?._synthetic){
+    walk.legs[0].departurePoint.commonName = walkFrom.commonName||'';
+    walk.legs[0].arrivalPoint.commonName   = walkTo.commonName||'';
+  }
+
+  // Build new leg array: replace selected legs with walk legs
+  const newLegs=[
+    ...legs.slice(0, indices[0]),
+    ...walk.legs,
+    ...legs.slice(indices[indices.length-1]+1),
+  ];
+
+  // ── Live timing ──────────────────────────────────────────
+  const walkMins = walk.mins;
+  const readyAt = new Date(Date.now() + walkMins * 60000); // when you arrive at boarding stop
+  const boardingStop = walk.legs[walk.legs.length-1].arrivalPoint;
+  const lineName = (newLegs.find(l => (l.mode?.id||'').toLowerCase() !== 'walking')
+    ?.routeOptions?.[0]?.name) || '';
+
+  let liveData = null;
+
+  // Show status
+  const action2 = document.querySelector('.walk-action');
+  if (action2) {
+    const p = document.createElement('div');
+    p.style.cssText = 'font-size:12px;color:var(--muted);margin-top:6px;font-family:monospace';
+    p.textContent = 'Fetching live schedule…';
+    action2.appendChild(p);
+  }
+
+  try {
+    // Strategy 1: if walk < 30min, live arrivals will cover it
+    // Strategy 2: for longer walks, use journey planner with future departure time
+    const boardingNaptanId = await getNaptanId(
+      boardingStop.commonName, boardingStop.lat, boardingStop.lon
+    );
+
+    // Always get live arrivals — shows next few trains at the stop right now
+    const liveArrivals = boardingNaptanId
+      ? await getLiveArrivals(boardingNaptanId, lineName)
+      : [];
+
+    // Use TfL journey planner departing at readyAt to get the actual scheduled service
+    const fromId = getStationId('from');
+    const toId   = getStationId('to');
+    // Re-plan from the boarding stop to destination, departing when you'd arrive there
+    const boardingId = boardingNaptanId || boardingStop.commonName;
+    const scheduledJourney = await getScheduledJourney(boardingId, toId, readyAt);
+
+    if (scheduledJourney) {
+      const firstLeg = scheduledJourney.legs[0];
+      const trainDeparts = new Date(firstLeg.departureTime);
+      const trainArrives = new Date(firstLeg.arrivalTime || firstLeg.departureTime);
+      const destArrival  = new Date(scheduledJourney.legs[scheduledJourney.legs.length-1].arrivalTime);
+      const waitMins     = Math.max(0, Math.round((trainDeparts - readyAt) / 60000));
+      const towards      = firstLeg.arrivalPoint?.commonName || '';
+      const scheduledLine= firstLeg.routeOptions?.[0]?.name || firstLeg.mode?.name || lineName;
+
+      // Find this train in live arrivals for real-time accuracy (if walk is short enough)
+      const matchedLive = liveArrivals.find(a =>
+        (a.lineName||'').toLowerCase().includes((scheduledLine||'').toLowerCase()) &&
+        Math.abs(new Date(a.expectedArrival) - trainDeparts) < 4 * 60000
+      );
+
+      const trainTime   = matchedLive ? new Date(matchedLive.expectedArrival) : trainDeparts;
+      const isLive      = !!matchedLive;
+
+      liveData = {
+        boardingStop:      boardingStop.commonName,
+        lineName:          scheduledLine,
+        towards,
+        trainTime,
+        trainTimeStr:      fmtTime(trainTime),
+        trainMinsFromNow:  minsFromNow(trainTime),
+        waitMins,
+        walkMins,
+        readyAtStr:        fmtTime(readyAt),
+        destArrival,
+        destArrivalStr:    fmtTime(destArrival),
+        destMinsFromNow:   minsFromNow(destArrival),
+        isLive,
+        // Show next 3 live trains at the stop too
+        nextTrains: liveArrivals.slice(0,3).map(a => ({
+          line:    a.lineName,
+          towards: a.towards || a.destinationName,
+          mins:    Math.round(a.timeToStation / 60),
+          time:    fmtTime(new Date(a.expectedArrival)),
+        })),
+      };
+    }
+  } catch(e) {
+    console.error('Live timing error:', e);
+  }
+
+  STATE.walkResult={
+    legs: newLegs,
+    totalMins: totalMins(newLegs),
+    steps: estSteps(newLegs),
+    liveData,
+  };
+  renderBase();
+  renderSwapRoute(newLegs);
+}
+
+// ── Main plan function ───────────────────────────────────────
+async function plan(){
+  const from=document.getElementById('from').value.trim();
+  const to=document.getElementById('to').value.trim();
+  const btn=document.getElementById('btn');
+  const out=document.getElementById('out');
+
+  if(!from||!to){out.innerHTML='<div class="err">Enter both origin and destination.</div>';return;}
+
+  btn.disabled=true;
+  STATE={basePath:null,selected:new Set(),walkResult:null};
+  setStatus('Resolving station names…');
+
+  try{
+    const fromId=getStationId('from');
+    const toId=getStationId('to');
+    setStatus('Fetching TfL journey…',`${from} → ${to}`);
+    const data=await tfl(`/Journey/JourneyResults/${encodeURIComponent(fromId)}/to/${encodeURIComponent(toId)}?mode=tube,dlr,overground,elizabeth-line,bus,national-rail`);
+    if(data?._disambig)throw new Error('Ambiguous station name — try being more specific.');
+    if(!data?.journeys?.length)throw new Error('No journeys found. Try full station names like "Finsbury Park" or "Stratford".');
+
+    const best=data.journeys.reduce((a,b)=>totalMins(a.legs)<=totalMins(b.legs)?a:b);
+    STATE.basePath={
+      legs: best.legs,
+      fromName: best.legs[0]?.departurePoint?.commonName||from,
+      toName: best.legs[best.legs.length-1]?.arrivalPoint?.commonName||to,
+    };
+    renderBase();
+    // Init map centred on midpoint of journey
+    const allPts = best.legs.flatMap(l=>[l.departurePoint,l.arrivalPoint]).filter(p=>p?.lat);
+    const midLat = allPts.reduce((s,p)=>s+p.lat,0)/allPts.length;
+    const midLon = allPts.reduce((s,p)=>s+p.lon,0)/allPts.length;
+    document.getElementById('mapWrap').style.display='block';
+    initMap(midLat, midLon);
+    renderTransitRoute(best.legs);
+  }catch(e){
+    console.error(e);
+    out.innerHTML=`<div class="err"><strong>Error</strong><br><br>${e.message}</div>`;
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+document.addEventListener('keydown',e=>{if(e.key==='Enter')plan();});
+</script>
+</body>
+</html>
